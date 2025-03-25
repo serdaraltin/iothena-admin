@@ -1,0 +1,78 @@
+services:
+  app:
+    image: datakapan-manager:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datakapan-dashboard
+    ports:
+      - "8000:80"
+      - "5173:5173"
+    networks:
+      - app-network
+    depends_on:
+      - database
+      - ftp
+    env_file:
+      - .env.production
+    #volumes:
+    #  - "/mnt/containers/datakapan/storage:/var/www/html/storage"
+    #entrypoint: [ "sh", "-c", "php artisan reverb:start" ]
+
+    restart: unless-stopped
+
+  database:
+    image: postgres:13
+    container_name: dashboard-postgres
+    ports:
+      - "5433:5432"
+    networks:
+      - app-network
+    env_file:
+      - .env.production
+    environment:
+      - POSTGRES_DB=${DB_DATABASE}
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    restart: unless-stopped
+
+  ftp:
+    image: stilliard/pure-ftpd
+    container_name: datakapan-ftp
+    ports:
+      - "211:21"
+      - "30000-30009:30000-30009"
+    networks:
+      - app-network
+    volumes:
+      - "/mnt/containers/datakapan/ftp/data:/home/ftp/"
+      - "/mnt/containers/datakapan/ftp/.passwd:/etc/pure-ftpd/passwd"
+    env_file:
+      - .env.production
+    environment:
+      - PUBLICHOST=${FTP_HOST}
+      - FTP_USER_NAME=${FTP_USERNAME}
+      - FTP_USER_PASS=${FTP_PASSWORD}
+      - FTP_USER_HOME=/home/ftp
+    restart: unless-stopped
+
+  redis:
+    image: redis:6
+    container_name: dashboard-redis
+    volumes:
+      - 'data.redis:/data'
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+    restart: unless-stopped
+
+volumes:
+  data.redis:
+    driver: local
+  storage:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
